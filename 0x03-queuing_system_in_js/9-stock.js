@@ -1,9 +1,10 @@
-import express from 'express';
-import redis from 'redis';
-import { promisify } from 'util';
+import express from 'express'; // Import Express framework
+import redis from 'redis'; // Import Redis library
+import { promisify } from 'util'; // Import promisify utility to convert callback-based functions to promises
 
 // utils =================================================
 
+// List of available products
 const listProducts = [
   {
     itemId: 1,
@@ -31,84 +32,96 @@ const listProducts = [
   },
 ];
 
+// Function to get an item by its ID
 function getItemById(id) {
   return listProducts.filter((item) => item.itemId === id)[0];
 }
 
 // redis ==========================================
 
+// Create a Redis client
 const client = redis.createClient();
+// Promisify the Redis get method for easier async/await handling
 const getAsync = promisify(client.get).bind(client);
 
+// Error handling for Redis client
 client.on('error', (error) => {
   console.log(`Redis client not connected to the server: ${error.message}`);
 });
 
+// Log when Redis client connects successfully
 client.on('connect', () => {
   console.log('Redis client connected to the server');
 });
 
+// Function to reserve stock for an item by its ID
 function reserveStockById(itemId, stock) {
-  client.set(`item.${itemId}`, stock);
+  client.set(`item.${itemId}`, stock); // Store the stock in Redis
 }
 
+// Async function to get the current reserved stock for an item by its ID
 async function getCurrentReservedStockById(itemId) {
-  const stock = await getAsync(`item.${itemId}`);
+  const stock = await getAsync(`item.${itemId}`); // Retrieve the stock from Redis
   return stock;
 }
 
 // express =============================================
 
+// Create an Express application
 const app = express();
-const port = 1245;
+const port = 1245; // Set the port for the server
 
-const notFound = { status: 'Product not found' };
+const notFound = { status: 'Product not found' }; // Message for non-existent products
 
+// Start listening on the specified port
 app.listen(port, () => {
   console.log(`app listening at http://localhost:${port}`);
 });
 
+// Endpoint to list all available products
 app.get('/list_products', (req, res) => {
-  res.json(listProducts);
+  res.json(listProducts); // Respond with the list of products in JSON format
 });
 
+// Endpoint to get details of a specific product by its ID
 app.get('/list_products/:itemId', async (req, res) => {
-  const itemId = Number(req.params.itemId);
-  const item = getItemById(itemId);
+  const itemId = Number(req.params.itemId); // Convert itemId from string to number
+  const item = getItemById(itemId); // Fetch the item by ID
 
   if (!item) {
-    res.json(notFound);
+    res.json(notFound); // Respond with not found message if the item does not exist
     return;
   }
 
-  const currentStock = await getCurrentReservedStockById(itemId);
+  const currentStock = await getCurrentReservedStockById(itemId); // Get current reserved stock
   const stock =
-    currentStock !== null ? currentStock : item.initialAvailableQuantity;
+    currentStock !== null ? currentStock : item.initialAvailableQuantity; // Determine current stock
 
-  item.currentQuantity = stock;
-  res.json(item);
+  item.currentQuantity = stock; // Add current stock to item details
+  res.json(item); // Respond with item details
 });
 
+// Endpoint to reserve a product by its ID
 app.get('/reserve_product/:itemId', async (req, res) => {
-  const itemId = Number(req.params.itemId);
-  const item = getItemById(itemId);
-  const noStock = { status: 'Not enough stock available', itemId };
-  const reservationConfirmed = { status: 'Reservation confirmed', itemId };
+  const itemId = Number(req.params.itemId); // Convert itemId from string to number
+  const item = getItemById(itemId); // Fetch the item by ID
+  const noStock = { status: 'Not enough stock available', itemId }; // Message for insufficient stock
+  const reservationConfirmed = { status: 'Reservation confirmed', itemId }; // Message for successful reservation
 
   if (!item) {
-    res.json(notFound);
+    res.json(notFound); // Respond with not found message if the item does not exist
     return;
   }
 
-  let currentStock = await getCurrentReservedStockById(itemId);
-  if (currentStock === null) currentStock = item.initialAvailableQuantity;
+  let currentStock = await getCurrentReservedStockById(itemId); // Get current reserved stock
+  if (currentStock === null) currentStock = item.initialAvailableQuantity; // Use initial stock if no reserved stock
 
   if (currentStock <= 0) {
-    res.json(noStock);
+    res.json(noStock); // Respond with no stock message if none is available
     return;
   }
 
-  reserveStockById(itemId, Number(currentStock) - 1);
+  reserveStockById(itemId, Number(currentStock) - 1); // Reserve stock by decrementing current stock
 
-  res.json(reservationConfirmed);
+  res.json(reservationConfirmed); // Respond with reservation confirmed message
 });

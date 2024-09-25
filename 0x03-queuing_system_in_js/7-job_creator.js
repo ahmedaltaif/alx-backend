@@ -1,5 +1,7 @@
+// Import the Kue library to manage job queues
 import kue from 'kue';
 
+// Define an array of job objects containing phone numbers and messages
 const jobs = [
   {
     phoneNumber: '4153518780',
@@ -47,22 +49,31 @@ const jobs = [
   }
 ];
 
+// Create a new Kue queue instance
 const queue = kue.createQueue();
+
+// Define the name of the queue for push notifications
 const queueName = 'push_notification_code_2';
 
+// Iterate over each job in the jobs array
 jobs.forEach((jobFormat) => {
+  // Create a new job in the queue with the job format data
   const job = queue.create(queueName, jobFormat).save((err) => {
+    // If no error, log the job creation with its job ID
     if (!err) console.log(`Notification job created: ${job.id}`);
   });
 
+  // Event listener for when the job completes successfully
   job.on('complete', () => {
     console.log(`Notification job ${job.id} completed`);
   });
 
+  // Event listener for when the job fails
   job.on('failed', (errorMessage) => {
     console.log(`Notification job ${job.id} failed: ${errorMessage}`);
   });
 
+  // Event listener for job progress updates
   job.on('progress', (progress) => {
     console.log(`Notification job ${job.id} ${progress}% complete`);
   });
